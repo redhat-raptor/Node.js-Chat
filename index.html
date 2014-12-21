@@ -19,7 +19,7 @@
 <body>
 
 <div class="container">
-    <div class="page-header"><h1>iMoney user tracking</h1></div>
+    <div class="page-header"><h1>Tracking users</h1></div>
 
     <div class="panel panel-default">
         <div class="panel-heading">User activities</div>
@@ -46,22 +46,58 @@
 
 
 <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
 <!-- Include all compiled plugins (below), or include individual files as needed -->
 <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+    "use strict";
+
+    var socketManager = {
+        socket: null,
+        init: function() {
+            this.socket = io.connect();
+        }
+    }
+
+    var userManager = {
+        data: {id: null},
+        init: function() {
+            this.data.id = $.cookie('userId');
+        },
+        identifyUser: function() {
+            var that = this;
+            socketManager.socket.json.send({
+                type: 'identify',
+                data: that.data
+            });
+        },
+        setUser: function(data) {
+            this.data = data;
+            $.cookie('userId', this.data.id);
+        }
+    };
+
     $(function(){
-        var iosocket = io.connect();
+        socketManager.init();
+        userManager.init();
 
-        iosocket.on('connect', function () {
-            $('#incomingChatMessages').append($('<li>Connected</li>'));
+        socketManager.socket.on('connect', function () {
+            $('#incomingChatMessages').append($('<li>Identifying user</li>'));
 
-            iosocket.on('message', function(message) {
+            userManager.identifyUser();
+
+            socketManager.socket.on('identify', function(data) {
+                userManager.setUser(data);
+            });
+
+            socketManager.socket.on('message', function(message) {
                 $('#incomingChatMessages').append($('<li></li>').text(message));
             });
-            iosocket.on('disconnect', function() {
+
+            socketManager.socket.on('disconnect', function() {
                 $('#incomingChatMessages').append('<li>Disconnected</li>');
             });
         });
@@ -70,8 +106,8 @@
             if(event.which == 13) {
                 event.preventDefault();
 
-                //iosocket.send($('#outgoingChatMessage').val());
-                iosocket.json.send({message: 'b'});
+                //socketManager.socket.send($('#outgoingChatMessage').val());
+                socketManager.socket.json.send({message: 'b'});
 
                 $('#incomingChatMessages').append($('<li></li>').text($('#outgoingChatMessage').val()));
                 $('#outgoingChatMessage').val('');
